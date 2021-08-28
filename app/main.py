@@ -58,12 +58,18 @@ class Bot(RedditBotBase):
     def process_comment(self, comment: praw.models.Comment):
         if not comment:
             return
+
         if 'could care less' in comment.body:
+            # Refresh is necessary because otherwise the replies will be empty -
+            # https://praw.readthedocs.io/en/latest/code_overview/models/comment.html?highlight=refresh#praw.models.Comment.refresh
+            comment.refresh()
             for reply in comment.replies:
                 if reply.author.name == os.getenv("USERNAME"):
                     LOGGER.info(f'Avoiding a duplicate reply to {_represent_comment(comment)}')
                     return
-            comment.reply('[Are you sure about that](https://could.care/)?')
+            comment.reply('[Are you sure about that](https://could.care/)?\n\n'
+                          '^(I am a bot. My code is) ^[here](https://github.com/scubbo/ABotThatCares). '
+                          '^(For more information, see) ^[here](https://youtu.be/om7O0MFkmpw).')
             LOGGER.info(f'Replied to {_represent_comment(comment)}')
             # sleep to avoid rate limit
             sleep(int(self.delay))
