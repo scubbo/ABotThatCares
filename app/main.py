@@ -9,7 +9,6 @@ import praw
 from dotenv import load_dotenv
 load_dotenv()
 
-from datetime import datetime
 from time import sleep
 
 LOGGER = logging.getLogger()
@@ -42,6 +41,8 @@ class RedditBotBase(object):
             password=os.getenv("PASSWORD"),
             user_agent=self.user_agent
         )
+        self.should_comment = os.getenv("SHOULD_COMMENT") == 'true'
+        LOGGER.info(f'DEBUG - should_comment is {self.should_comment}')
 
         LOGGER.info(f"Starting up... {self.user_agent}")
 
@@ -52,8 +53,10 @@ class Bot(RedditBotBase):
         LOGGER.info("Bot is running")
 
         subreddit = self.reddit.subreddit(self.subreddit)
-        for comment in subreddit.stream.comments():
+        for idx, comment in enumerate(subreddit.stream.comments()):
             self.process_comment(comment)
+            if not idx % 1000 and idx:
+                LOGGER.info(f'Handled {idx} comments')
 
     def process_comment(self, comment: praw.models.Comment):
         if not comment:
@@ -67,10 +70,13 @@ class Bot(RedditBotBase):
                 if reply.author.name == os.getenv("USERNAME"):
                     LOGGER.info(f'Avoiding a duplicate reply to {_represent_comment(comment)}')
                     return
-            comment.reply('[Are you sure about that](https://could.care/)?\n\n'
-                          '^(I am a bot. My code is) ^[here](https://github.com/scubbo/ABotThatCares). '
-                          '^(For more information, see) ^[here](https://youtu.be/om7O0MFkmpw).')
-            LOGGER.info(f'Replied to {_represent_comment(comment)}')
+            if self.should_comment:
+                comment.reply('[Are you sure about that](https://could.care/)?\n\n'
+                              '^(I am a bot. My code is) ^[here](https://github.com/scubbo/ABotThatCares). '
+                              '^(For more information, see) ^[here](https://youtu.be/om7O0MFkmpw).')
+                LOGGER.info(f'Replied to {_represent_comment(comment)}')
+            else:
+                LOGGER.info(f'Would have replied to {_represent_comment(comment)}')
             # sleep to avoid rate limit
             sleep(int(self.delay))
 
@@ -80,5 +86,4 @@ def _represent_comment(comment: praw.models.Comment):
 
 
 if __name__ == "__main__":
-    LOGGER.info('Running main')
     Bot().main()
